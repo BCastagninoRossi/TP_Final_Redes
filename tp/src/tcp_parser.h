@@ -14,7 +14,13 @@
 
 #define BUFFER_SIZE          3000
 
+typedef struct {
+    char usuario[100];
+    char timestamp[100];
+    char mensaje[1000];
+} PDUData;
+
 
 // #define DBG_RECEIVED_DATA
-void procesar_datos_tcp(char *buffer, int buffer_size);
+int procesar_datos_tcp(char *buffer, int buffer_size, PDUData *pdu_data);
 int processReceivedData(char *buffer, int buffersize, int *buffer_ptr, char *pdu_candidate, int *pdu_candidate_ptr);

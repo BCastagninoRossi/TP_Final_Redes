@@ -1,11 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> /* necesario para memset() */
-#include <unistd.h> /* necesario para close() */
 #include "tcp_parser.h"
 
+#define MAX_PDU_SIZE         10000
+#define BUFFER_SIZE          3000
+
+#define PDU_CANDIDATE_LINE_OK	 1
+#define PDU_ERROR_BAD_FORMAT	-1
+#define PDU_NEED_MORE_DATA       0
+
+
+
 // Función para procesar datos TCP y parsear PDU
-void procesar_datos_tcp(char *buffer, int buffer_size) {
+int procesar_datos_tcp(char *buffer, int buffer_size, PDUData *pdu_data) {
     int inbytes = buffer_size;
     int pdu_status;
     int buffer_ptr = 0, pdu_candidate_ptr = 0;
@@ -18,29 +26,37 @@ void procesar_datos_tcp(char *buffer, int buffer_size) {
         if (pdu_status == PDU_CANDIDATE_LINE_OK) {
             printf("PDU completo: %s\n", pdu_candidate);
 
-            // Parsear PDU con ' ' como delimitador
-            char *usuario = strtok(pdu_candidate, " ");
-            char *timestamp = strtok(NULL, " ");
-            char *mensaje = strtok(NULL, " ");
+            // Parsear PDU con 'á' como delimitador
+            char *usuario = strtok(pdu_candidate, "á");
+            char *timestamp = strtok(NULL, "á");
+            char *mensaje = strtok(NULL, "á");
 
-            // Guardar los campos de la PDU en un string
-            char PDU_data[1000];
-            sprintf(PDU_data, "Usuario: %s, Timestamp: %s, Mensaje: %s", usuario, timestamp, mensaje);
-            printf("PDU_data: %s\n", PDU_data);
+            // Guardar los campos de la PDU en la estructura
+            strncpy(pdu_data->usuario, usuario, sizeof(pdu_data->usuario) - 1);
+            strncpy(pdu_data->timestamp, timestamp, sizeof(pdu_data->timestamp) - 1);
+            strncpy(pdu_data->mensaje, mensaje, sizeof(pdu_data->mensaje) - 1);
+
+            //Muestra los datos de la PDU
+            printf("Usuario: %s\n", pdu_data->usuario);
+            printf("Timestamp: %s\n", pdu_data->timestamp);
+            printf("Mensaje: %s\n", pdu_data->mensaje);
 
             // Limpiar memoria
             pdu_candidate_ptr = 0;
             memset(pdu_candidate, 0, sizeof(pdu_candidate));
+            return 1; // Indicar que se ha procesado una PDU completa
         } else if (pdu_status == PDU_ERROR_BAD_FORMAT) {
             printf("ERROR: Formato de PDU incorrecto\n");
             // Limpiar memoria
             pdu_candidate_ptr = 0;
             memset(pdu_candidate, 0, sizeof(pdu_candidate));
+            return -1; // Indicar error de formato
         } else {
             printf("PDU parcial: %s\n", pdu_candidate);
             printf("No se encontró delimitador. Probablemente se necesita leer otro buffer\n");
         }
     }
+    return 0; // Indicar que se necesita más datos
 }
 
 // Función para delimitar y procesar PDU
@@ -54,14 +70,14 @@ int processReceivedData(char *buffer, int buffersize, int *buffer_ptr, char *pdu
 
         // Criterio de PDU: \x04 (MSEP)
         if (*pdu_candidate_ptr >= 1 && *buffer == 0x04) {
-            *pdu_candidate++ = ' ';
+            *pdu_candidate++ = 'á';
             (*pdu_candidate_ptr)++;
             return PDU_CANDIDATE_LINE_OK;
         } else if (*buffer != '\x02' && *buffer != '\x04' && (*buffer < 32 || *buffer > 126)) {
             return PDU_ERROR_BAD_FORMAT;
         } else {
             if (*buffer == '\x02' || *buffer == '\x04') {
-                *pdu_candidate = ' ';
+                *pdu_candidate = 'á';
             } else {
                 *pdu_candidate = *buffer;
             }
@@ -86,7 +102,11 @@ int processReceivedData(char *buffer, int buffersize, int *buffer_ptr, char *pdu
 //         char buffer[BUFFER_SIZE];
 //         strcpy(buffer, test_buffers[i]);
 //         int inbytes = strlen(buffer);
-//         procesar_datos_tcp(buffer, inbytes);
+//         PDUData pdu_data;
+//         int result = procesar_datos_tcp(buffer, inbytes, &pdu_data);
+//         if (result == 1) {
+//             printf("Datos PDU: Usuario: %s, Timestamp: %s, Mensaje: %s\n", pdu_data.usuario, pdu_data.timestamp, pdu_data.mensaje);
+//         }
 //     }
 
 //     return 0;
