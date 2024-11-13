@@ -32,10 +32,10 @@ void log_message_syslog(const char *conversation_id, const char *role, const cha
     closelog();
 }
 
-int main() {
-    // Example usage
-    log_message_syslog("chat-0001", "AGENT", "Esto es un mensaje en syslog protocol", "positive", 0.8);
-    log_message_syslog("chat-0002", "CLIENT", "Esto es otro mensaje en syslog protocol", "negative", -0.8);
+// int main() {
+//     // Example usage
+//     log_message_syslog("chat-0001", "AGENT", "Esto es un mensaje en syslog protocol", "positive", 0.8);
+//     log_message_syslog("chat-0002", "CLIENT", "Esto es otro mensaje en syslog protocol", "negative", -0.8);
 
-    return 0;
-}
+//     return 0;
+// }

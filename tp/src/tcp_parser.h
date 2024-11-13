@@ -5,6 +5,7 @@
 #include <string.h> /* needed for memset() */
 #include <syslog.h>
 #include <curl/curl.h>
+#include <stdbool.h>
 
 #define MAX_PDU_SIZE         10000
 
@@ -18,9 +19,14 @@ typedef struct {
     char usuario[100];
     char timestamp[100];
     char mensaje[1000];
-} PDUData;
+    bool is_valid;
+    } PDUData;
 
+typedef struct {
+    char sentiment[100];
+    float score;
+} SentimentData;
 
 // #define DBG_RECEIVED_DATA
-int procesar_datos_tcp(char *buffer, int buffer_size, PDUData *pdu_data);
+void procesar_datos_tcp(char *buffer, int buffer_size, PDUData *pdu_data, int client_id);
 int processReceivedData(char *buffer, int buffersize, int *buffer_ptr, char *pdu_candidate, int *pdu_candidate_ptr);

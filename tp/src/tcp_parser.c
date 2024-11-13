@@ -2,6 +2,15 @@
 #include <stdlib.h>
 #include <string.h> /* necesario para memset() */
 #include "tcp_parser.h"
+#include "syslogger.c"
+
+#include <curl/curl.h>
+#include <json-c/json.h>
+
+
+#define API_URL "http://api.udesa.matsunaga.com.ar:15000/analyze"
+#define API_TOKEN "token1"
+
 
 #define MAX_PDU_SIZE         10000
 #define BUFFER_SIZE          3000
@@ -12,8 +21,83 @@
 
 
 
+
+// Función para manejar la respuesta de CURL
+static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+    size_t total_size = size * nmemb;
+    strncat((char*)userp, (char*)contents, total_size);
+    return total_size;
+}
+
+void completar_consulta_http(PDUData *pdu_data, SentimentData *result) {
+    CURL *curl;
+    CURLcode res;
+    struct curl_slist *headers = NULL;
+    char readBuffer[1024] = {0};
+
+    // Inicializar CURL
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    curl = curl_easy_init();
+    if(curl) {
+        // Crear los datos del POST en formato JSON
+        json_object *jobj = json_object_new_object();
+        json_object *jmessage = json_object_new_string(pdu_data->mensaje);
+        json_object_object_add(jobj, "message", jmessage);
+        const char *json_data = json_object_to_json_string(jobj);
+
+        printf("Enviando mensaje a la API: %s\n", json_data);
+
+        // Configurar headers
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+        headers = curl_slist_append(headers, "X-API-Token: " API_TOKEN);
+
+        // Configurar CURL para realizar una solicitud POST
+        curl_easy_setopt(curl, CURLOPT_URL, API_URL);
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+        // Realizar la solicitud
+        res = curl_easy_perform(curl);
+        if(res != CURLE_OK) {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        } else {
+            // Parsear la respuesta JSON
+            json_object *parsed_json = json_tokener_parse(readBuffer);
+            json_object *sentiment;
+            json_object *sentiment_value;
+
+            if (json_object_object_get_ex(parsed_json, "sentiment", &sentiment) &&
+                json_object_object_get_ex(parsed_json, "sentiment_value", &sentiment_value)) {
+                printf("Sentiment: %s\n", json_object_get_string(sentiment));
+                printf("Sentiment Value: %f\n", json_object_get_double(sentiment_value));
+                // Guardar los campos de la respuesta en la estructura
+                strncpy(result->sentiment, json_object_get_string(sentiment), sizeof(result->sentiment) - 1);
+                result->score = json_object_get_double(sentiment_value);
+            } else {
+                printf("Error al parsear la respuesta JSON\n");
+                printf("Respuesta de la API: %s\n", readBuffer);
+            }
+
+            // Liberar memoria JSON
+            json_object_put(parsed_json);
+        }
+
+        // Limpiar CURL
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(headers);
+        json_object_put(jobj); // Liberar memoria JSON
+    }
+
+    // Limpiar CURL global
+    curl_global_cleanup();
+}
+
+
+
 // Función para procesar datos TCP y parsear PDU
-int procesar_datos_tcp(char *buffer, int buffer_size, PDUData *pdu_data) {
+void procesar_datos_tcp(char *buffer, int buffer_size, PDUData *pdu_data, int client_id) {
     int inbytes = buffer_size;
     int pdu_status;
     int buffer_ptr = 0, pdu_candidate_ptr = 0;
@@ -35,28 +119,42 @@ int procesar_datos_tcp(char *buffer, int buffer_size, PDUData *pdu_data) {
             strncpy(pdu_data->usuario, usuario, sizeof(pdu_data->usuario) - 1);
             strncpy(pdu_data->timestamp, timestamp, sizeof(pdu_data->timestamp) - 1);
             strncpy(pdu_data->mensaje, mensaje, sizeof(pdu_data->mensaje) - 1);
+            pdu_data->is_valid = 1;
 
             //Muestra los datos de la PDU
             printf("Usuario: %s\n", pdu_data->usuario);
             printf("Timestamp: %s\n", pdu_data->timestamp);
             printf("Mensaje: %s\n", pdu_data->mensaje);
 
+            // Llamar a la API
+            SentimentData result;
+            completar_consulta_http(pdu_data, &result);
+
+            // Loguear los resultados con syslog
+            char client_id_char[10];
+            sprintf(client_id_char, "%d", client_id);
+            if (strstr(pdu_data->usuario, "user") != NULL) {
+                log_message_syslog(client_id_char, "CLIENT", pdu_data->mensaje, result.sentiment, result.score);
+            } else {
+                log_message_syslog(client_id_char, "AGENT", pdu_data->mensaje, result.sentiment, result.score);
+            }
+
             // Limpiar memoria
             pdu_candidate_ptr = 0;
             memset(pdu_candidate, 0, sizeof(pdu_candidate));
-            return 1; // Indicar que se ha procesado una PDU completa
+            memset(&result, 0, sizeof(result));
+            
+            
         } else if (pdu_status == PDU_ERROR_BAD_FORMAT) {
             printf("ERROR: Formato de PDU incorrecto\n");
             // Limpiar memoria
             pdu_candidate_ptr = 0;
             memset(pdu_candidate, 0, sizeof(pdu_candidate));
-            return -1; // Indicar error de formato
         } else {
             printf("PDU parcial: %s\n", pdu_candidate);
             printf("No se encontró delimitador. Probablemente se necesita leer otro buffer\n");
         }
     }
-    return 0; // Indicar que se necesita más datos
 }
 
 // Función para delimitar y procesar PDU
