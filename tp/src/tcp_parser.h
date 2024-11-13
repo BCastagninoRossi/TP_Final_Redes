@@ -10,9 +10,11 @@
 
 #define PDU_CANDIDATE_LINE_OK	 1
 #define PDU_ERROR_BAD_FORMAT	-1
-#define PDU_NEED_MORE_DATA       0
+#define PDU_NEED_MORE_DATA      0
+
+#define BUFFER_SIZE          3000
 
 
 // #define DBG_RECEIVED_DATA
-int tcp_parser(int rec_bytes, char * buffer);
+void procesar_datos_tcp(char *buffer, int buffer_size);
 int processReceivedData(char *buffer, int buffersize, int *buffer_ptr, char *pdu_candidate, int *pdu_candidate_ptr);

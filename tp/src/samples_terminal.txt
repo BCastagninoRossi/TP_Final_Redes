@@ -1,0 +1,4 @@
+echo -e "usuario1\x02timestamp1\x02mensaje1\x04" | nc localhost 8080
+echo -e "usuario2\x02timestamp2\x02mensaje2\x04usuario3\x02timestamp3\x02mensaje3\x04" | nc localhost 8080
+echo -e "usuario4\x02timestamp4\x02mensaje4\x04usuario5\x02timestamp5\x02mensaje5\x04usuario6\x02timestamp6\x02mensaje6\x04" | nc localhost 8080
+echo -e "usuario7\x02timestamp7\x02mensaje7_incomplete" | nc localhost 8080
