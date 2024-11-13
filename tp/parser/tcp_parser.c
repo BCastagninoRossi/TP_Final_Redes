@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h> /* necesario para memset() */
 #include "tcp_parser.h"
-#include "syslogger.c"
+#include "../utils/syslogger.h"
 
 #include <curl/curl.h>
 #include <json-c/json.h>

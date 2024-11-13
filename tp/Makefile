@@ -1,5 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Iinclude
+LDFLAGS = -lcurl -ljson-c
 
 # Directories
 SRC_DIR = src
@@ -21,7 +22,7 @@ OBJ_FILES = $(SRC_FILES:.c=.o) $(PARSER_FILES:.c=.o) $(SERVER_FILES:.c=.o) $(UTI
 all: main
 
 main: $(OBJ_FILES)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
