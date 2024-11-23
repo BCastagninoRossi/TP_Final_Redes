@@ -19,7 +19,6 @@ typedef struct {
     char usuario[100];
     char timestamp[100];
     char mensaje[1000];
-    bool is_valid;
     } PDUData;
 
 typedef struct {
@@ -28,5 +27,5 @@ typedef struct {
 } SentimentData;
 
 // #define DBG_RECEIVED_DATA
-void procesar_datos_tcp(char *buffer, int buffer_size, PDUData *pdu_data, int client_id);
+void process_tcp_data(char *buffer, int buffer_size, PDUData *pdu_data, int client_id);
 int processReceivedData(char *buffer, int buffersize, int *buffer_ptr, char *pdu_candidate, int *pdu_candidate_ptr);

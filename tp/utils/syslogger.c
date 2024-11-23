@@ -7,16 +7,7 @@
 #define HOSTNAME "localhost" 
 #define PRIORITY 163          
 
-void log_message_syslog(const char *conversation_id, const char *role, const char *message, const char *sentiment, float sentiment_value) {
-    // Get current time
-    time_t rawtime;
-    struct tm * timeinfo;
-    char timestamp[20]; // For timestamp: e.g., "Sep 16 03:14:16"
-    
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
-    strftime(timestamp, sizeof(timestamp), "%b %d %H:%M:%S", timeinfo);
-    
+void log_message_syslog(const char *timestamp, const char *conversation_id, const char *role, const char *message, const char *sentiment, float sentiment_value) {
     // Open syslog with your desired options
     openlog("ChatSyslog", LOG_PID | LOG_CONS, LOG_USER);
 
