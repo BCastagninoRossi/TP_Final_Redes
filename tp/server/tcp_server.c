@@ -5,8 +5,8 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <pthread.h>
-#include "tcp_parser.h"
-#include "tcp_server.h"
+#include "../include/tcp_parser.h"
+#include "../include/tcp_server.h"
 
 
 #include <sys/types.h>
@@ -47,7 +47,7 @@ int init_tcp_server() {
     return server_fd;
 }
 
-void *client_handler(void* client_data) {
+void *client_thread_helper(void* client_data) {
     client_t * client = (client_t *)client_data;
     int client_id = client->id;
     int client_fd =*(client->fd);
@@ -83,7 +83,7 @@ void accept_connections(int server_fd) {
 
         // Crear un hilo para manejar la conexión del cliente
         pthread_t thread_id;
-        if (pthread_create(&thread_id, NULL, client_handler, (void *)&client) != 0) {
+        if (pthread_create(&thread_id, NULL, client_thread_helper, (void *)&client) != 0) {
             perror("Error al crear hilo");
             free(client_fd);
             continue;
@@ -102,25 +102,16 @@ void handle_client(int client_fd, int client_id) {
     // Recibir datos del cliente
     while ((bytes_read = recv(client_fd, buffer, BUFFER_SIZE, 0)) > 0) {
         buffer[bytes_read] = '\0'; // Agregar terminador de cadena
-        printf("Chat ID: %d\nMensaje recibido: %s\n", client_id, buffer);
+        // printf("Chat ID: %d\nMensaje recibido: %s\n", client_id, buffer);
 
         // Procesar el mensaje
         PDUData pdu_data;
-        procesar_datos_tcp(buffer, bytes_read, &pdu_data, client_id); 
-        // if (pdu_data.is_valid) {
-        //     // Datos PDU parseados correctamente
-        //     printf("Datos PDU: Usuario: %s, Timestamp: %s, Mensaje: %s\n", pdu_data.usuario, pdu_data.timestamp, pdu_data.mensaje);
-
-        // } else {
-        //     // Error de formato en la PDU
-        //     printf("Error de formato en la PDU\n");
-        // }
-
+        process_tcp_data(buffer, bytes_read, &pdu_data, client_id); 
+        
         // Enviar respuesta al cliente (por ejemplo, un ACK)
         char *response = "Mensaje recibido\n";
         send(client_fd, response, strlen(response), 0);
     }
-
     if (bytes_read == 0) {
         printf("Cliente desconectado\n");
     } else if (bytes_read < 0) {

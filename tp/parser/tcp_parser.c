@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> /* necesario para memset() */
-#include "tcp_parser.h"
+#include "../include/tcp_parser.h"
 #include "../utils/syslogger.h"
+#include <ctype.h>
 
 #include <curl/curl.h>
 #include <json-c/json.h>
@@ -19,9 +20,6 @@
 #define PDU_ERROR_BAD_FORMAT	-1
 #define PDU_NEED_MORE_DATA       0
 
-
-
-
 // Función para manejar la respuesta de CURL
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t total_size = size * nmemb;
@@ -29,7 +27,7 @@ static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *use
     return total_size;
 }
 
-void completar_consulta_http(PDUData *pdu_data, SentimentData *result) {
+void complete_http_request(PDUData *pdu_data, SentimentData *result) {
     CURL *curl;
     CURLcode res;
     struct curl_slist *headers = NULL;
@@ -94,10 +92,49 @@ void completar_consulta_http(PDUData *pdu_data, SentimentData *result) {
     curl_global_cleanup();
 }
 
+// Función para validar los campos de la PDU
+int validate_fields(const char *usuario, const char *timestamp, const char *mensaje) {
+    // Validar usuario
+    if (strlen(usuario) > 40) {
+        return PDU_ERROR_BAD_FORMAT;
+    }
+    for (int i = 0; i < strlen(usuario); i++) {
+        if ((unsigned char)usuario[i] > 127) {
+            return PDU_ERROR_BAD_FORMAT;
+        }
+    }
 
+    // Validar timestamp
+    if (strlen(timestamp) != 19) {
+        return PDU_ERROR_BAD_FORMAT;
+    }
+    if (timestamp[4] != '-' || timestamp[7] != '-' || timestamp[10] != ' ' || timestamp[13] != ':' || timestamp[16] != ':') {
+        return PDU_ERROR_BAD_FORMAT;
+    }
+    for (int i = 0; i < 19; i++) {
+        if (i == 4 || i == 7 || i == 10 || i == 13 || i == 16) {
+            continue;
+        }
+        if (!isdigit(timestamp[i])) {
+            return PDU_ERROR_BAD_FORMAT;
+        }
+    }
+
+    // Validar mensaje
+    if (strlen(mensaje) > 200) {
+        return PDU_ERROR_BAD_FORMAT;
+    }
+    for (int i = 0; i < strlen(mensaje); i++) {
+        if ((unsigned char)mensaje[i] > 127) {
+            return PDU_ERROR_BAD_FORMAT;
+        }
+    }
+
+    return 0; // Campos válidos
+}
 
 // Función para procesar datos TCP y parsear PDU
-void procesar_datos_tcp(char *buffer, int buffer_size, PDUData *pdu_data, int client_id) {
+void process_tcp_data(char *buffer, int buffer_size, PDUData *pdu_data, int client_id) {
     int inbytes = buffer_size;
     int pdu_status;
     int buffer_ptr = 0, pdu_candidate_ptr = 0;
@@ -108,35 +145,43 @@ void procesar_datos_tcp(char *buffer, int buffer_size, PDUData *pdu_data, int cl
     while (inbytes - buffer_ptr - 1 > 0) {
         pdu_status = processReceivedData(buffer, inbytes, &buffer_ptr, pdu_candidate, &pdu_candidate_ptr);
         if (pdu_status == PDU_CANDIDATE_LINE_OK) {
-            printf("PDU completo: %s\n", pdu_candidate);
+            // printf("PDU completo: %s\n", pdu_candidate);
 
             // Parsear PDU con 'á' como delimitador
             char *usuario = strtok(pdu_candidate, "á");
             char *timestamp = strtok(NULL, "á");
             char *mensaje = strtok(NULL, "á");
 
+            // Validar los campos
+            if (validate_fields(usuario, timestamp, mensaje) == PDU_ERROR_BAD_FORMAT) {
+                printf("ERROR: Formato de PDU incorrecto\n");
+                // Limpiar memoria y continuar con la siguiente PDU
+                pdu_candidate_ptr = 0;
+                memset(pdu_candidate, 0, sizeof(pdu_candidate));
+                continue;
+            }
+
             // Guardar los campos de la PDU en la estructura
             strncpy(pdu_data->usuario, usuario, sizeof(pdu_data->usuario) - 1);
             strncpy(pdu_data->timestamp, timestamp, sizeof(pdu_data->timestamp) - 1);
             strncpy(pdu_data->mensaje, mensaje, sizeof(pdu_data->mensaje) - 1);
-            pdu_data->is_valid = 1;
 
             //Muestra los datos de la PDU
-            printf("Usuario: %s\n", pdu_data->usuario);
-            printf("Timestamp: %s\n", pdu_data->timestamp);
-            printf("Mensaje: %s\n", pdu_data->mensaje);
+            // printf("Usuario: %s\n", pdu_data->usuario);
+            // printf("Timestamp: %s\n", pdu_data->timestamp);
+            // printf("Mensaje: %s\n", pdu_data->mensaje);
 
             // Llamar a la API
             SentimentData result;
-            completar_consulta_http(pdu_data, &result);
+            complete_http_request(pdu_data, &result);
 
             // Loguear los resultados con syslog
             char client_id_char[10];
             sprintf(client_id_char, "%d", client_id);
-            if (strstr(pdu_data->usuario, "user") != NULL) {
-                log_message_syslog(client_id_char, "CLIENT", pdu_data->mensaje, result.sentiment, result.score);
+            if (strstr(pdu_data->usuario, "Client") != NULL) {
+                log_message_syslog(pdu_data->timestamp,client_id_char, pdu_data->usuario, pdu_data->mensaje, result.sentiment, result.score);
             } else {
-                log_message_syslog(client_id_char, "AGENT", pdu_data->mensaje, result.sentiment, result.score);
+                log_message_syslog(pdu_data->timestamp, client_id_char, pdu_data->usuario, pdu_data->mensaje, result.sentiment, result.score);
             }
 
             // Limpiar memoria
@@ -147,7 +192,7 @@ void procesar_datos_tcp(char *buffer, int buffer_size, PDUData *pdu_data, int cl
             
         } else if (pdu_status == PDU_ERROR_BAD_FORMAT) {
             printf("ERROR: Formato de PDU incorrecto\n");
-            // Limpiar memoria
+            // Limpiar memoria y continuar con la siguiente PDU
             pdu_candidate_ptr = 0;
             memset(pdu_candidate, 0, sizeof(pdu_candidate));
         } else {
@@ -172,6 +217,8 @@ int processReceivedData(char *buffer, int buffersize, int *buffer_ptr, char *pdu
             (*pdu_candidate_ptr)++;
             return PDU_CANDIDATE_LINE_OK;
         } else if (*buffer != '\x02' && *buffer != '\x04' && (*buffer < 32 || *buffer > 126)) {
+            // Más logica de validacion de PDU
+            // printf("-------Buffer: %s\n", buffer);
             return PDU_ERROR_BAD_FORMAT;
         } else {
             if (*buffer == '\x02' || *buffer == '\x04') {

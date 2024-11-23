@@ -19,7 +19,7 @@ UTILS_FILES = $(wildcard $(UTILS_DIR)/*.c)
 OBJ_FILES = $(SRC_FILES:.c=.o) $(PARSER_FILES:.c=.o) $(SERVER_FILES:.c=.o) $(UTILS_FILES:.c=.o)
 
 # Targets
-all: main
+all: main clean_objs
 
 main: $(OBJ_FILES)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
@@ -29,3 +29,6 @@ main: $(OBJ_FILES)
 
 clean:
 	rm -f $(OBJ_FILES) main
+
+clean_objs:
+	rm -f $(OBJ_FILES)
