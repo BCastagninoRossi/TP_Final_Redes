@@ -1,33 +1,81 @@
-# C Networking Project
+# Proyecto de Redes en C
 
-This project is a C networking project that includes modules for text parsing, TCP server creation, and more. The project has been restructured to have a professional and well-organized structure.
+Este proyecto es un proyecto de redes en C que incluye módulos para el análisis de texto, la creación de servidores TCP y más. El proyecto ha sido reestructurado para tener una estructura profesional y bien organizada.
 
-## Folder Structure
+## Comenzando
 
-The project is divided into the following subfolders based on responsibility:
+### Prerrequisitos
 
-- `parser`: Contains code for text parsing.
-- `server`: Contains code for TCP server creation.
-- `include`: Contains header (.h) files.
-- `src`: Contains the main source code.
-- `utils`: Contains auxiliary functions.
+- GCC (GNU Compiler Collection)
+- libcurl
+- libjson-c
 
-## Makefile
+### Instalación de Dependencias
 
-The `Makefile` is organized to reflect the new structure, separating dependencies and targets based on the defined modules (e.g., parser, server, utils). It follows standard compilation conventions and allows for building the entire project or individual modules independently.
+En sistemas basados en Debian/Ubuntu, puedes instalar las dependencias necesarias con los siguientes comandos:
 
-## Documentation
+```sh
+sudo apt-get update
+sudo apt-get install gcc libcurl4-openssl-dev libjson-c-dev
+```
 
-Documentation files, such as `README.md`, are located in the root directory. Additional documentation can be found in the `docs` folder.
+### Construyendo el Proyecto
 
-## Preservation of Functionality
+Para construir el proyecto, navega al directorio `tp` y ejecuta el siguiente comando:
 
-The functionality in the files located in `tp/src` has been preserved, as everything is working correctly. Only the necessary changes to reorganize the project have been made while preserving its functionality.
+```sh
+make
+```
 
-## Removal of Redundancies
+### Ejecutando el Proyecto
 
-Redundant files like `tp/src/pepe` and `tp/src/nc` have been removed, and all configuration files point to the reorganized structure.
+Después de construir el proyecto, puedes ejecutar el servidor usando el siguiente comando:
 
-## Goal
+```sh
+./main
+```
 
-The goal of this restructuring is to make the project easy to maintain, extend, and understand for any developer. The project is now ready for use in a professional environment and adheres to a standard structure for C projects.
+### Limpiando el Proyecto
+
+Para limpiar los archivos generados después de la compilación, puedes usar el siguiente comando:
+
+```sh
+make clean
+```
+
+## Uso
+
+El proyecto incluye un servidor TCP que escucha conexiones entrantes en el puerto 8080. Los clientes pueden enviar mensajes al servidor, que procesará los mensajes y registrará los resultados usando syslog.
+
+### Enviando Mensajes
+
+Puedes usar el comando `nc` (netcat) para enviar mensajes al servidor. Aquí hay algunos ejemplos:
+
+```sh
+echo -e "usuario1\x02timestamp1\x02mensaje1\x04" | nc localhost 8080
+echo -e "usuario2\x02timestamp2\x02mensaje2\x04usuario3\x02timestamp3\x02mensaje3\x04" | nc localhost 8080
+echo -e "usuario4\x02timestamp4\x02mensaje4\x04usuario5\x02timestamp5\x02mensaje5\x04usuario6\x02timestamp6\x02mensaje6\x04" | nc localhost 8080
+echo -e "usuario7\x02timestamp7\x02mensaje7_incomplete" | nc localhost 8080
+```
+
+También puedes enviar un archivo binario `.bin` al servidor. Para crear un archivo binario de prueba, puedes usar el archivo `make_bin.py` presente en la carpeta `utils`. Aquí hay un ejemplo de cómo usarlo:
+
+```sh
+python3 utils/make_bin.py
+cat test_case_FINAL.bin | nc localhost 8080
+```
+
+## Estructura del Proyecto
+
+El proyecto está organizado de la siguiente manera:
+
+```
+tp/
+├── include/        # Archivos de cabecera
+├── parser/         # Código fuente del parser
+├── server/         # Código fuente del servidor
+├── utils/          # Utilidades y scripts
+├── src/            # Código fuente principal
+├── Makefile        # Archivo de construcción
+└── README.md       # Documentación del proyecto
+```
