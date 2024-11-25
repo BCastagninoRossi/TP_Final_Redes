@@ -17,7 +17,8 @@
 #define BUFFER_SIZE          3000
 
 #define PDU_CANDIDATE_LINE_OK	 1
-#define PDU_ERROR_BAD_FORMAT	-1
+#define PDU_ERROR_BAD_FORMAT_DELIMITERS	-1
+#define PDU_ERROR_BAD_FORMAT_FIELDS	-2
 #define PDU_NEED_MORE_DATA       0
 
 // Función para manejar la respuesta de CURL
@@ -92,52 +93,38 @@ void complete_http_request(PDUData *pdu_data, SentimentData *result) {
     curl_global_cleanup();
 }
 
+
+
 // Función para validar los campos de la PDU
 int validate_fields(const char *usuario, const char *timestamp, const char *mensaje) {
     // Validar usuario
     if (strlen(usuario) > 40) {
-        return PDU_ERROR_BAD_FORMAT;
-    }
-    for (int i = 0; i < strlen(usuario); i++) {
-        if ((unsigned char)usuario[i] > 127) {
-            return PDU_ERROR_BAD_FORMAT;
-        }
+        return PDU_ERROR_BAD_FORMAT_FIELDS;
     }
 
     // Validar timestamp
     if (strlen(timestamp) != 19) {
-        return PDU_ERROR_BAD_FORMAT;
+        return PDU_ERROR_BAD_FORMAT_FIELDS;
     }
     if (timestamp[4] != '-' || timestamp[7] != '-' || timestamp[10] != ' ' || timestamp[13] != ':' || timestamp[16] != ':') {
-        return PDU_ERROR_BAD_FORMAT;
+        return PDU_ERROR_BAD_FORMAT_FIELDS;
     }
-    for (int i = 0; i < 19; i++) {
-        if (i == 4 || i == 7 || i == 10 || i == 13 || i == 16) {
-            continue;
-        }
-        if (!isdigit(timestamp[i])) {
-            return PDU_ERROR_BAD_FORMAT;
-        }
-    }
+
 
     // Validar mensaje
     if (strlen(mensaje) > 200) {
-        return PDU_ERROR_BAD_FORMAT;
-    }
-    for (int i = 0; i < strlen(mensaje); i++) {
-        if ((unsigned char)mensaje[i] > 127) {
-            return PDU_ERROR_BAD_FORMAT;
-        }
+        return PDU_ERROR_BAD_FORMAT_FIELDS;
     }
 
     return 0; // Campos válidos
 }
 
 // Función para procesar datos TCP y parsear PDU
-void process_tcp_data(char *buffer, int buffer_size, PDUData *pdu_data, int client_id) {
-    int inbytes = buffer_size;
+void process_tcp_data(char *buffer, int rec_bytes, PDUData *pdu_data, int client_id) {
+    int inbytes = rec_bytes;
     int pdu_status;
-    int buffer_ptr = 0, pdu_candidate_ptr = 0;
+    int buffer_ptr = 0;
+    int pdu_candidate_ptr = 0;
     char pdu_candidate[MAX_PDU_SIZE + 1];
     memset(pdu_candidate, 0, sizeof(pdu_candidate));
 
@@ -148,21 +135,22 @@ void process_tcp_data(char *buffer, int buffer_size, PDUData *pdu_data, int clie
             // printf("PDU completo: %s\n", pdu_candidate);
 
             // Parsear PDU con 'á' como delimitador
-            char *usuario = strtok(pdu_candidate, "á");
-            char *timestamp = strtok(NULL, "á");
-            char *mensaje = strtok(NULL, "á");
+            char *usuario = strtok(pdu_candidate, "\x29");
+            char *timestamp = strtok(NULL, "\x29");
+            char *mensaje = strtok(NULL, "\x29");
 
 
             // Validar los campos
-            if (validate_fields(usuario, timestamp, mensaje) == PDU_ERROR_BAD_FORMAT) {
-                printf("ERROR: Formato de PDU incorrecto\n");
+            if (validate_fields(usuario, timestamp, mensaje) == PDU_ERROR_BAD_FORMAT_FIELDS) {
+                printf("ERROR: Formato de CAMPOS DEL PDU incorrecto.\n");
                 // Limpiar memoria y continuar con la siguiente PDU
+                buffer_ptr++;  // Saltear caracter invalido
                 pdu_candidate_ptr = 0;
                 memset(pdu_candidate, 0, sizeof(pdu_candidate));
 
                 char client_id_char[10];
                 sprintf(client_id_char, "%d", client_id);
-                log_message_syslog("ERROR: BAD PDU FORMAT",client_id_char, "None", "None", "None", 0.0);
+                log_message_syslog("ERROR: BAD PDU FORMAT | Invalid Fields",client_id_char, "None", "None", "None", 0.0);
                 continue;
             }
     
@@ -196,14 +184,22 @@ void process_tcp_data(char *buffer, int buffer_size, PDUData *pdu_data, int clie
             memset(&result, 0, sizeof(result));
             
             
-        } else if (pdu_status == PDU_ERROR_BAD_FORMAT) {
-            printf("ERROR: Formato de PDU incorrecto\n");
+        } else if (pdu_status == PDU_ERROR_BAD_FORMAT_DELIMITERS) {
+            printf("ERROR: Formato de PDU incorrecto | Error en los chars del PDU\n");
             // Limpiar memoria y continuar con la siguiente PDU
+
+            buffer_ptr++; 
             pdu_candidate_ptr = 0;
             memset(pdu_candidate, 0, sizeof(pdu_candidate));
+            char client_id_char[10];
+            sprintf(client_id_char, "%d", client_id);
+            log_message_syslog("ERROR: BAD PDU FORMAT | PDU Contains invalid chars", client_id_char, "None", "None", "None", 0.0);
+
         } else {
-            printf("PDU parcial: %s\n", pdu_candidate);
-            printf("No se encontró delimitador. Probablemente se necesita leer otro buffer\n");
+            char client_id_char[10];
+            sprintf(client_id_char, "%d", client_id);
+            log_message_syslog("ERROR: INCOMPLETE PDU",client_id_char, pdu_candidate, "None", "None", 0.0);
+            printf("ERROR | PDU parcial: %s\n", pdu_candidate);
         }
     }
 }
@@ -214,21 +210,24 @@ int processReceivedData(char *buffer, int buffersize, int *buffer_ptr, char *pdu
     buffer += *buffer_ptr;
 
     int chunk = (buffersize - *buffer_ptr);
+    int invalid_chars = 0;
     for (int i = 0; i < chunk; i++) {
         (*buffer_ptr)++;
 
         // Criterio de PDU: \x04 (MSEP)
         if (*pdu_candidate_ptr >= 1 && *buffer == 0x04) {
-            *pdu_candidate++ = 'á';
+            *pdu_candidate++ = '\x29';
             (*pdu_candidate_ptr)++;
+            if (invalid_chars) {
+                return PDU_ERROR_BAD_FORMAT_DELIMITERS;
+            }
             return PDU_CANDIDATE_LINE_OK;
         } else if (*buffer != '\x02' && *buffer != '\x04' && (*buffer < 32 || *buffer > 126)) {
-            // Más logica de validacion de PDU
-            // printf("-------Buffer: %s\n", buffer);
-            return PDU_ERROR_BAD_FORMAT;
+            invalid_chars = 1;
+            *pdu_candidate = *buffer;
         } else {
             if (*buffer == '\x02' || *buffer == '\x04') {
-                *pdu_candidate = 'á';
+                *pdu_candidate = '\x29';
             } else {
                 *pdu_candidate = *buffer;
             }
@@ -239,26 +238,3 @@ int processReceivedData(char *buffer, int buffersize, int *buffer_ptr, char *pdu
     }
     return PDU_NEED_MORE_DATA;
 }
-
-// // Función principal para probar el procesamiento de datos TCP
-// int main() {
-//     char *test_buffers[] = {
-//         "usuario1\x02timestamp1\x02mensaje1\x04",
-//         "usuario2\x02timestamp2\x02mensaje2\x04usuario3\x02timestamp3\x02mensaje3\x04",
-//         "usuario4\x02timestamp4\x02mensaje4\x04usuario5\x02timestamp5\x02mensaje5\x04usuario6\x02timestamp6\x02mensaje6\x04",
-//         "usuario7\x02timestamp7\x02mensaje7_incomplete"
-//     };
-
-//     for (int i = 0; i < 4; i++) {
-//         char buffer[BUFFER_SIZE];
-//         strcpy(buffer, test_buffers[i]);
-//         int inbytes = strlen(buffer);
-//         PDUData pdu_data;
-//         int result = procesar_datos_tcp(buffer, inbytes, &pdu_data);
-//         if (result == 1) {
-//             printf("Datos PDU: Usuario: %s, Timestamp: %s, Mensaje: %s\n", pdu_data.usuario, pdu_data.timestamp, pdu_data.mensaje);
-//         }
-//     }
-
-//     return 0;
-// }

@@ -3,7 +3,7 @@
 
 #include <netinet/in.h>
 
-#define PORT 8080            // Puerto para escuchar conexiones
+#define PORT 15001            // Puerto para escuchar conexiones
 #define BUFFER_SIZE 10000     // Tamaño del buffer de lectura
 #define MAX_CLIENTS 10        // Número máximo de conexiones pendientes en la cola
 

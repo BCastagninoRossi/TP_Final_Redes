@@ -102,7 +102,7 @@ void handle_client(int client_fd, int client_id) {
     // Recibir datos del cliente
     while ((bytes_read = recv(client_fd, buffer, BUFFER_SIZE, 0)) > 0) {
         buffer[bytes_read] = '\0'; // Agregar terminador de cadena
-        // printf("Chat ID: %d\nMensaje recibido: %s\n", client_id, buffer);
+        //printf("Chat ID: %d\nMensaje recibido: %s\n", client_id, buffer);
 
         // Procesar el mensaje
         PDUData pdu_data;
