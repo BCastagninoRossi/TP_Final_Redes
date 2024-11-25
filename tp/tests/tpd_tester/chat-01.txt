@@ -1,0 +1,6 @@
+Client Mary¿2024-11-20 01:02:03¿Hi
+Agent John¿2024-11-20 01:02:04¿My name is Peter, How can I help you?
+Client Mary¿2024-11-20 01:02:05¿I bought a computer from you and when I opened the box the screen was broken
+Agent John¿2024-11-20 01:02:06¿Oh, so sorry to hear that, I am going to help you get a new computer. I am going to need the purchase information
+Client Mary¿2024-11-20 01:02:07¿Ok, thanks. I am in hurry and I needed the computer to work on the weekend.
+Agent John¿2024-11-20 01:02:08¿Don't worry we are going to send it overnight if we have the same product you ordered on stock

@@ -152,14 +152,20 @@ void process_tcp_data(char *buffer, int buffer_size, PDUData *pdu_data, int clie
             char *timestamp = strtok(NULL, "á");
             char *mensaje = strtok(NULL, "á");
 
+
             // Validar los campos
             if (validate_fields(usuario, timestamp, mensaje) == PDU_ERROR_BAD_FORMAT) {
                 printf("ERROR: Formato de PDU incorrecto\n");
                 // Limpiar memoria y continuar con la siguiente PDU
                 pdu_candidate_ptr = 0;
                 memset(pdu_candidate, 0, sizeof(pdu_candidate));
+
+                char client_id_char[10];
+                sprintf(client_id_char, "%d", client_id);
+                log_message_syslog("ERROR: BAD PDU FORMAT",client_id_char, "None", "None", "None", 0.0);
                 continue;
             }
+    
 
             // Guardar los campos de la PDU en la estructura
             strncpy(pdu_data->usuario, usuario, sizeof(pdu_data->usuario) - 1);
