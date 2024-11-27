@@ -128,6 +128,7 @@ void process_tcp_data(char *buffer, int rec_bytes, PDUData *pdu_data, int client
     char pdu_candidate[MAX_PDU_SIZE + 1];
     memset(pdu_candidate, 0, sizeof(pdu_candidate));
 
+    // Acá deberia volver a leer el buffer en caso de que no se haya procesado todo un PDU? como hacemo'?? 
     // Procesar datos recibidos
     while (inbytes - buffer_ptr - 1 > 0) {
         pdu_status = processReceivedData(buffer, inbytes, &buffer_ptr, pdu_candidate, &pdu_candidate_ptr);
@@ -196,10 +197,13 @@ void process_tcp_data(char *buffer, int rec_bytes, PDUData *pdu_data, int client
             log_message_syslog("ERROR: BAD PDU FORMAT | PDU Contains invalid chars", client_id_char, "None", "None", "None", 0.0);
 
         } else {
+            // Aca capaz hay que manejar la nueva leida del buffer o algo asi por el PDU incompleto
+
             char client_id_char[10];
             sprintf(client_id_char, "%d", client_id);
             log_message_syslog("ERROR: INCOMPLETE PDU",client_id_char, pdu_candidate, "None", "None", 0.0);
             printf("ERROR | PDU parcial: %s\n", pdu_candidate);
+            
         }
     }
 }
