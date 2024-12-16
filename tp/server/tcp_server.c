@@ -47,15 +47,19 @@ int init_tcp_server() {
     return server_fd;
 }
 
+
 void *client_thread_helper(void* client_data) {
-    client_t * client = (client_t *)client_data;
+    client_t *client = (client_t *)client_data;
     int client_id = client->id;
-    int client_fd =*(client->fd);
-    free (client->fd);
+    int client_fd = *(client->fd);
+    free(client->fd);
     handle_client(client_fd, client_id);
     close(client_fd);
+    free(client);
     return NULL;
 }
+
+
 
 void accept_connections(int server_fd) {
     struct sockaddr_in client_address;
@@ -77,15 +81,16 @@ void accept_connections(int server_fd) {
         client_id++;
 
         //estructura para almacenar la informacion del cliente
-        client_t client;
-        client.id = client_id;
-        client.fd = client_fd;
+        client_t *client = (client_t *)malloc(sizeof(client_t));
+        client->id = client_id;
+        client->fd = client_fd;
 
         // Crear un hilo para manejar la conexión del cliente
         pthread_t thread_id;
-        if (pthread_create(&thread_id, NULL, client_thread_helper, (void *)&client) != 0) {
+        if (pthread_create(&thread_id, NULL, client_thread_helper, (void *)client) != 0) {
             perror("Error al crear hilo");
             free(client_fd);
+            free(client);
             continue;
         }
         pthread_detach(thread_id); // El hilo se limpiará automáticamente al terminar
