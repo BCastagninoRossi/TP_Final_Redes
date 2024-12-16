@@ -48,5 +48,3 @@ void log_message_syslog(const char *timestamp, const char *conversation_id, cons
         printf("Syslog message sent: %s\n", log_msg);
     }
 }
-
-// ...existing code...
