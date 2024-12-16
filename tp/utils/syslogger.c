@@ -1,32 +1,48 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <syslog.h>
 #include <string.h>
-#include <time.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 
-#define HOSTNAME "localhost" 
-#define PRIORITY 163          
+#define SYSLOG_PORT 514
+#define SYSLOG_SERVER "127.0.0.1"
+#define HOSTNAME "localhost"
+#define PRIORITY 163
 
-void log_message_syslog(const char *timestamp, const char *conversation_id, const char *role, const char *message, const char *sentiment, float sentiment_value) {
-    // Open syslog with your desired options
-    openlog("ChatSyslog", LOG_PID | LOG_CONS, LOG_USER);
+int syslog_socket;
+struct sockaddr_in syslog_addr;
 
-    // Format the message string
-    char log_msg[10000];
-    snprintf(log_msg, sizeof(log_msg), "<%d> %s %s %s %s %s (sentiment: %s sentiment_value: %.1f)",
-             PRIORITY, timestamp, HOSTNAME, conversation_id, role, message, sentiment, sentiment_value);
+void init_syslog_connection() {
+    // Create a socket for sending syslog messages
+    syslog_socket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (syslog_socket < 0) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
 
-    // Send to syslog
-    syslog(LOG_INFO, "%s", log_msg);
-
-    // Close syslog
-    closelog();
+    // Configure the syslog server address
+    memset(&syslog_addr, 0, sizeof(syslog_addr));
+    syslog_addr.sin_family = AF_INET;
+    syslog_addr.sin_port = htons(SYSLOG_PORT);
+    if (inet_pton(AF_INET, SYSLOG_SERVER, &syslog_addr.sin_addr) <= 0) {
+        perror("Invalid syslog server address");
+        close(syslog_socket);
+        exit(EXIT_FAILURE);
+    }
 }
 
-// int main() {
-//     // Example usage
-//     log_message_syslog("chat-0001", "AGENT", "Esto es un mensaje en syslog protocol", "positive", 0.8);
-//     log_message_syslog("chat-0002", "CLIENT", "Esto es otro mensaje en syslog protocol", "negative", -0.8);
+void log_message_syslog(const char *timestamp, const char *conversation_id, const char *role, const char *message, const char *sentiment, float sentiment_value) {
+    // Format the message string
+    char log_msg[10000];
+    snprintf(log_msg, sizeof(log_msg), "<163> Timestamp: %s | Host: %s | client-%s | Role: %s | Message: %s (sentiment: %s sentiment_value: %.1f)",
+             timestamp, HOSTNAME, conversation_id, role, message, sentiment, sentiment_value);
 
-//     return 0;
-// }
+    // Send the message to the syslog server
+    int bytes_sent = sendto(syslog_socket, log_msg, strlen(log_msg), 0, (struct sockaddr *)&syslog_addr, sizeof(syslog_addr));
+    if (bytes_sent < 0) {
+        perror("Error sending syslog message");
+    } else {
+        // printf("Syslog message sent: %s\n", log_msg);
+    }
+}

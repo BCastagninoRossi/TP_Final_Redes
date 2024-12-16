@@ -173,11 +173,7 @@ void process_tcp_data(char *buffer, int rec_bytes, PDUData *pdu_data, int client
             // Loguear los resultados con syslog
             char client_id_char[10];
             sprintf(client_id_char, "%d", client_id);
-            if (strstr(pdu_data->usuario, "Client") != NULL) {
-                log_message_syslog(pdu_data->timestamp,client_id_char, pdu_data->usuario, pdu_data->mensaje, result.sentiment, result.score);
-            } else {
-                log_message_syslog(pdu_data->timestamp, client_id_char, pdu_data->usuario, pdu_data->mensaje, result.sentiment, result.score);
-            }
+            log_message_syslog(pdu_data->timestamp, client_id_char, pdu_data->usuario, pdu_data->mensaje, result.sentiment, result.score);
 
             // Limpiar memoria
             pdu_candidate_ptr = 0;
@@ -201,7 +197,7 @@ void process_tcp_data(char *buffer, int rec_bytes, PDUData *pdu_data, int client
 
             char client_id_char[10];
             sprintf(client_id_char, "%d", client_id);
-            log_message_syslog("ERROR: INCOMPLETE PDU",client_id_char, pdu_candidate, "None", "None", 0.0);
+            log_message_syslog("ERROR: INCOMPLETE PDU", client_id_char, pdu_candidate, "None", "None", 0.0);
             printf("ERROR | PDU parcial: %s\n", pdu_candidate);
             
         }
