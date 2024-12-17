@@ -43,6 +43,6 @@ void log_message_syslog(const char *timestamp, const char *conversation_id, cons
     if (bytes_sent < 0) {
         perror("Error sending syslog message");
     } else {
-        // printf("Syslog message sent: %s\n", log_msg);
+        printf("Syslog message sent: %s\n", log_msg);
     }
 }

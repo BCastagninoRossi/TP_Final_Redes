@@ -53,7 +53,12 @@ void *client_thread_helper(void* client_data) {
     int client_id = client->id;
     int client_fd = *(client->fd);
     free(client->fd);
+
+
     handle_client(client_fd, client_id);
+    
+    
+    
     close(client_fd);
     free(client);
     return NULL;
@@ -104,6 +109,11 @@ void handle_client(int client_fd, int client_id) {
     char buffer[BUFFER_SIZE];
     int bytes_read;
 
+    // Inicializar PDU candidate y su puntero para cada cliente
+    char pdu_candidate[MAX_PDU_SIZE + 1];
+    int pdu_candidate_ptr = 0;
+    memset(pdu_candidate, 0, sizeof(pdu_candidate));
+
     // Recibir datos del cliente
     while ((bytes_read = recv(client_fd, buffer, BUFFER_SIZE, 0)) > 0) {
         buffer[bytes_read] = '\0'; // Agregar terminador de cadena
@@ -111,7 +121,7 @@ void handle_client(int client_fd, int client_id) {
 
         // Procesar el mensaje
         PDUData pdu_data;
-        process_tcp_data(buffer, bytes_read, &pdu_data, client_id); 
+        process_tcp_data(buffer, bytes_read, &pdu_data, client_id, pdu_candidate, &pdu_candidate_ptr); 
         
         // Enviar respuesta al cliente (por ejemplo, un ACK)
         char *response = "Mensaje recibido\n";
@@ -122,4 +132,4 @@ void handle_client(int client_fd, int client_id) {
     } else if (bytes_read < 0) {
         perror("Error al recibir datos");
     }
-}
+} 

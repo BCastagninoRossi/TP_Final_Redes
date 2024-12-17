@@ -27,5 +27,5 @@ typedef struct {
 } SentimentData;
 
 // #define DBG_RECEIVED_DATA
-void process_tcp_data(char *buffer, int rec_bytes, PDUData *pdu_data, int client_id);
+void process_tcp_data(char *buffer, int rec_bytes, PDUData *pdu_data, int client_id, char *pdu_candidate, int *pdu_candidate_ptr);
 int processReceivedData(char *buffer, int buffersize, int *buffer_ptr, char *pdu_candidate, int *pdu_candidate_ptr);

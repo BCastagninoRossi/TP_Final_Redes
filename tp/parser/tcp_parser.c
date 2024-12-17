@@ -117,54 +117,39 @@ int validate_fields(const char *usuario, const char *timestamp, const char *mens
     }
 
     return 0; // Campos válidos
-}
+} 
 
 // Función para procesar datos TCP y parsear PDU
-void process_tcp_data(char *buffer, int rec_bytes, PDUData *pdu_data, int client_id) {
-    int inbytes = rec_bytes;
-    int pdu_status;
+void process_tcp_data(char *buffer, int rec_bytes, PDUData *pdu_data, int client_id, char *pdu_candidate, int *pdu_candidate_ptr) {
     int buffer_ptr = 0;
-    int pdu_candidate_ptr = 0;
-    char pdu_candidate[MAX_PDU_SIZE + 1];
-    memset(pdu_candidate, 0, sizeof(pdu_candidate));
+    int pdu_status;
 
-    // Acá deberia volver a leer el buffer en caso de que no se haya procesado todo un PDU? como hacemo'?? 
     // Procesar datos recibidos
-    while (inbytes - buffer_ptr - 1 > 0) {
-        pdu_status = processReceivedData(buffer, inbytes, &buffer_ptr, pdu_candidate, &pdu_candidate_ptr);
+    while (rec_bytes - buffer_ptr > 0) {
+        pdu_status = processReceivedData(buffer, rec_bytes, &buffer_ptr, pdu_candidate, pdu_candidate_ptr);
         if (pdu_status == PDU_CANDIDATE_LINE_OK) {
-            // printf("PDU completo: %s\n", pdu_candidate);
-
             // Parsear PDU con 'á' como delimitador
             char *usuario = strtok(pdu_candidate, "\x29");
             char *timestamp = strtok(NULL, "\x29");
             char *mensaje = strtok(NULL, "\x29");
 
-
             // Validar los campos
             if (validate_fields(usuario, timestamp, mensaje) == PDU_ERROR_BAD_FORMAT_FIELDS) {
                 printf("ERROR: Formato de CAMPOS DEL PDU incorrecto.\n");
                 // Limpiar memoria y continuar con la siguiente PDU
-                buffer_ptr++;  // Saltear caracter invalido
-                pdu_candidate_ptr = 0;
-                memset(pdu_candidate, 0, sizeof(pdu_candidate));
+                *pdu_candidate_ptr = 0;
+                memset(pdu_candidate, 0, MAX_PDU_SIZE + 1);
 
                 char client_id_char[10];
                 sprintf(client_id_char, "%d", client_id);
-                log_message_syslog("ERROR: BAD PDU FORMAT | Invalid Fields",client_id_char, "None", "None", "None", 0.0);
+                log_message_syslog("ERROR: BAD PDU FORMAT | Invalid Fields", client_id_char, "None", "None", "None", 0.0);
                 continue;
             }
-    
 
             // Guardar los campos de la PDU en la estructura
             strncpy(pdu_data->usuario, usuario, sizeof(pdu_data->usuario) - 1);
             strncpy(pdu_data->timestamp, timestamp, sizeof(pdu_data->timestamp) - 1);
             strncpy(pdu_data->mensaje, mensaje, sizeof(pdu_data->mensaje) - 1);
-
-            //Muestra los datos de la PDU
-            // printf("Usuario: %s\n", pdu_data->usuario);
-            // printf("Timestamp: %s\n", pdu_data->timestamp);
-            // printf("Mensaje: %s\n", pdu_data->mensaje);
 
             // Llamar a la API
             SentimentData result;
@@ -176,30 +161,20 @@ void process_tcp_data(char *buffer, int rec_bytes, PDUData *pdu_data, int client
             log_message_syslog(pdu_data->timestamp, client_id_char, pdu_data->usuario, pdu_data->mensaje, result.sentiment, result.score);
 
             // Limpiar memoria
-            pdu_candidate_ptr = 0;
-            memset(pdu_candidate, 0, sizeof(pdu_candidate));
-            memset(&result, 0, sizeof(result));
-            
-            
+            *pdu_candidate_ptr = 0;
+            memset(pdu_candidate, 0, MAX_PDU_SIZE + 1);
         } else if (pdu_status == PDU_ERROR_BAD_FORMAT_DELIMITERS) {
             printf("ERROR: Formato de PDU incorrecto | Error en los chars del PDU\n");
             // Limpiar memoria y continuar con la siguiente PDU
+            *pdu_candidate_ptr = 0;
+            memset(pdu_candidate, 0, MAX_PDU_SIZE + 1);
 
-            buffer_ptr++; 
-            pdu_candidate_ptr = 0;
-            memset(pdu_candidate, 0, sizeof(pdu_candidate));
             char client_id_char[10];
             sprintf(client_id_char, "%d", client_id);
             log_message_syslog("ERROR: BAD PDU FORMAT | PDU Contains invalid chars", client_id_char, "None", "None", "None", 0.0);
-
-        } else {
-            // Aca capaz hay que manejar la nueva leida del buffer o algo asi por el PDU incompleto
-
-            char client_id_char[10];
-            sprintf(client_id_char, "%d", client_id);
-            log_message_syslog("ERROR: INCOMPLETE PDU", client_id_char, pdu_candidate, "None", "None", 0.0);
-            printf("ERROR | PDU parcial: %s\n", pdu_candidate);
-            
+        } else if (pdu_status == PDU_NEED_MORE_DATA) {
+            // Almacenar PDU parcial y esperar más datos
+            printf("PDU parcial: %s\n", pdu_candidate);
         }
     }
 }
